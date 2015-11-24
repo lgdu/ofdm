@@ -1,0 +1,10 @@
+simul.m 文件为画循环功率谱密度
+ratio.m 文件为画不同信噪比下的比值曲线
+prb.m 文件计算某一信噪比下某一比值门限下误码率
+
+cyclic_spectrum.m 文件为频域平滑循环谱功率图
+cs_threshold.m 文件为利用循环谱计算比值
+
+其余.m文件为OFDM信号的生成文件
+
+data.xls 文件为不同参数的比值数据
