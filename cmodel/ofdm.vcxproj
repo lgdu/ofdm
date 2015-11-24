@@ -43,6 +43,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>lib/etc;lib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -62,6 +63,28 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="lib\ap_int.h" />
+    <ClInclude Include="lib\ap_utils.h" />
+    <ClInclude Include="lib\etc\ap_fixed_sim.h" />
+    <ClInclude Include="lib\etc\ap_headers.h" />
+    <ClInclude Include="lib\etc\ap_int_sim.h" />
+    <ClInclude Include="lib\etc\ap_private.h" />
+    <ClInclude Include="lib\etc\autopilot_apint.h" />
+    <ClInclude Include="lib\etc\autopilot_dt.h" />
+    <ClInclude Include="lib\etc\autopilot_enum.h" />
+    <ClInclude Include="lib\etc\autopilot_ssdm_bits.h" />
+    <ClInclude Include="lib\etc\autopilot_ssdm_op.h" />
+    <ClInclude Include="lib\etc\c_ap_int_sim.h" />
+    <ClInclude Include="lib\etc\hlslib_headers.h" />
+    <ClInclude Include="lib\hls_stream.h" />
+    <ClInclude Include="ofdm.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="ofdm.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="lib\etc\autopilot_dt.def" />
+    <None Include="lib\etc\autopilot_dt_ext.def" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

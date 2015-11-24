@@ -13,5 +13,68 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="lib">
+      <UniqueIdentifier>{7aec553a-850a-4b29-bdd1-e4252a10a3bb}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="ofdm.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="lib\etc\ap_fixed_sim.h">
+      <Filter>lib</Filter>
+    </ClInclude>
+    <ClInclude Include="lib\etc\ap_headers.h">
+      <Filter>lib</Filter>
+    </ClInclude>
+    <ClInclude Include="lib\ap_int.h">
+      <Filter>lib</Filter>
+    </ClInclude>
+    <ClInclude Include="lib\etc\ap_int_sim.h">
+      <Filter>lib</Filter>
+    </ClInclude>
+    <ClInclude Include="lib\etc\ap_private.h">
+      <Filter>lib</Filter>
+    </ClInclude>
+    <ClInclude Include="lib\ap_utils.h">
+      <Filter>lib</Filter>
+    </ClInclude>
+    <ClInclude Include="lib\etc\autopilot_apint.h">
+      <Filter>lib</Filter>
+    </ClInclude>
+    <ClInclude Include="lib\etc\autopilot_dt.h">
+      <Filter>lib</Filter>
+    </ClInclude>
+    <ClInclude Include="lib\etc\autopilot_enum.h">
+      <Filter>lib</Filter>
+    </ClInclude>
+    <ClInclude Include="lib\etc\autopilot_ssdm_bits.h">
+      <Filter>lib</Filter>
+    </ClInclude>
+    <ClInclude Include="lib\etc\autopilot_ssdm_op.h">
+      <Filter>lib</Filter>
+    </ClInclude>
+    <ClInclude Include="lib\etc\c_ap_int_sim.h">
+      <Filter>lib</Filter>
+    </ClInclude>
+    <ClInclude Include="lib\hls_stream.h">
+      <Filter>lib</Filter>
+    </ClInclude>
+    <ClInclude Include="lib\etc\hlslib_headers.h">
+      <Filter>lib</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="ofdm.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="lib\etc\autopilot_dt.def">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="lib\etc\autopilot_dt_ext.def">
+      <Filter>Source Files</Filter>
+    </None>
   </ItemGroup>
 </Project>
