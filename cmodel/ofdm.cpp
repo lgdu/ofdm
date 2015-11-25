@@ -14,38 +14,28 @@ unsigned int xor(unsigned int val){
   }
   return (data&0x1);
 }
-/*
-void ofdm_sigdat_generator(
-  ofdm_cfg_t                        TXVECTOR,
-  stream <unsigned char> &          DataBuffer,
-  stream <ofdm_databits_t> &        SigDataBuffer
+void ofdm_sig_generator(
+  unsigned int                      datarate,
+  unsigned int                      length,
+  stream <ap_uint<8>> &             SigBuffer
   ){
-    ofdm_databits_t SigData;
-    unsigned int Ndbps=0; // Data bits per symbol
-    SigData.IsSig=true;
-    SigData.DataBits=0;
-    switch (TXVECTOR.DATARATE){
-    case 6: SigData.DataBits.range(3,0)=0xb;Ndbps=24;break;
-    case 9: SigData.DataBits.range(3,0)=0xf;Ndbps=36;break;
-    case 12:SigData.DataBits.range(3,0)=0xa;Ndbps=48;break;
-    case 18:SigData.DataBits.range(3,0)=0xe;Ndbps=72;break;
-    case 24:SigData.DataBits.range(3,0)=0x9;Ndbps=116;break;
-    case 36:SigData.DataBits.range(3,0)=0xd;Ndbps=144;break;
-    case 48:SigData.DataBits.range(3,0)=0x8;Ndbps=192;break;
-    case 54:SigData.DataBits.range(3,0)=0xc;Ndbps=216;break;
-    default:;
-    }
-    SigData.DataBits.range(16,5)=reverse(TXVECTOR.LENGTH,12);
-    SigData.DataBits.range(17,17) =xor(SigData.DataBits.range(24,0).to_uint());
-    SigDataBuffer.write(SigData);
+    ap_uint<8> SigData=0;
+    ap_uint<12> DataLength=length;
+    ap_uint<1>  parity=0;
+    SigData.range(3,0)  =datarate; 
+    SigData.range(7,5)  =DataLength.range(2,0);
+    parity+=SigData[0]+SigData[1]+SigData[2]+SigData[3]+SigData[4]+SigData[5]+SigData[6]+SigData[7];
+    SigBuffer.write(SigData);
 
-    unsigned int Nsym = ceil((16+8*TXVECTOR.LENGTH+6)/Ndbps); // number of OFDM symbols
-    unsigned int Ndata = Nsym*Ndbps; // number of bits in the DATA field
-    unsigned int NdataByte=Ndata/8;
-    SigData.IsSig=false;
-    
+    SigData=DataLength.range(10,3);
+    parity+=SigData[0]+SigData[1]+SigData[2]+SigData[3]+SigData[4]+SigData[5]+SigData[6]+SigData[7];
+    SigBuffer.write(SigData);
+   
+    SigData.range(0,0)=DataLength.range(11,11);
+    parity+=SigData[0];
+    SigData.range(7,1)=parity;
+    SigBuffer.write(SigData);
 }
-*/
 
 /*
 Scrambler 
@@ -61,11 +51,11 @@ with M^8=
      0     0     0     1     0     0     1     1
      0     1     0     0     0     0     0     1
 */
-void ofdm_data_scrambler(
-      unsigned int           Nbyte,         //bytes number of DATA
-      unsigned int           Length,        //Data Length
-      stream<unsigned char > & DataBuffer,
-      stream<unsigned char > & ScrambBuffer
+void ofdm_data_generator(
+      unsigned int              Nbyte,         //Bytes number of DATA
+      unsigned int              Length,        //Data Length
+      stream<unsigned char >  & DataBuffer,
+      stream<ap_uint<8> >     & ScrambBuffer
   ){
     ap_uint<8> shift_reg=0x7f;
     for(int i=0;i<Nbyte;++i){
@@ -79,7 +69,7 @@ void ofdm_data_scrambler(
       for(int j=0;j<=7;++j){
         data[j]=data[j]+shift_reg[j];
       }
-      ScrambBuffer.write(data.to_uint());
+      ScrambBuffer.write(data));
       shift_reg[7]  = shift_reg_pre[6]+shift_reg_pre[3];
       shift_reg[6]  = shift_reg_pre[5]+shift_reg_pre[2];
       shift_reg[5]  = shift_reg_pre[4]+shift_reg_pre[1];
@@ -106,11 +96,46 @@ void ofdm_databits_reshape(
       DataBitsBuffer.write(DataBits);
     }
 }
+void ofdm_conv_feeder(
+    unsigned int Nbyte,
+    stream <ap_uint<8>>   & SigDataBuffer,
+    stream <ap_uint<6>>   & ConvolFeederDataBuffer
+){
+    unsigned int src_bit_cnt=0;
+    unsigned int dst_bit_cnt=6;
+    ap_uint<8> cur_src=0;
+    ap_uint<8> old_src=0;
+    ap_uint<6> data;
+    while(src_bit_cnt<(Nbyte*8)){
+      unsigned int flag=(dst_bit_cnt-6)%8;
+      if(src_bit_cnt<dst_bit_cnt) {
+          old_src =cur_src;
+          cur_src=SigDataBuffer.read();
+          src_bit_cnt+=8;
+      }
+      if(flag==0){
+        data=cur_src.range(5,0);
+      }else if(flag==6){
+        data.range(1,0)=old_src.range(7,6);
+        data.range(5,2)=cur_src.range(3,0);
+      }else if(flag==4){
+        data.range(3,0)=old_src.range(7,4);
+        data.range(5,4)=cur_src.range(1,0);
+      }else if(flag==2){
+        data.range(5,0)=cur_src.range(7,2);
+      }else{
+        assert(!"Invalid Flag!\n");
+      }
+      ConvolFeederDataBuffer.write(data);
+      dst_bit_cnt+=6;
+    }
+}
+/*
 void ofdm_data_generator(
    unsigned int                           Length        ,                      //Data Byte Length 
    unsigned int                           Ndbps         ,                      //Data Bits per symbol
    stream <unsigned char> &               DataBuffer    ,
-   stream <ofdm_databits_t> &             DataBitsBuffer
+   stream <ap_uint<6>> &                  ConvolFeederDataBuffer               //Data To Convolutional Encoder 
    ){
     unsigned int Nsym = ceil((16+8*Length+6)/Ndbps); // number of OFDM symbols
     unsigned int Ndata = Nsym*Ndbps;                 // number of bits in the DATA field
@@ -121,20 +146,121 @@ void ofdm_data_generator(
         DataBuffer,
         ScramblerDataBuffer
     );
-    ofdm_databits_reshape(
-        Ndbps,          //Data Bits Per symbol
-        Nsym,           //Symbol Number
-        ScramblerDataBuffer,
-        DataBitsBuffer 
+    ofdm_conv_data_feeder(
+            Ndata/8,
+            ScramblerDataBuffer,
+            ConvolFeederDataBuffer
     );
 }
+*/
+void ofdm_sigdat_generator(
+  //ofdm_cfg_t                TXVECTOR,
+  unsigned int              datarate,
+  unsigned int              length,
+  unsigned int              Nbyte,
 
+  stream<unsigned char > &  DataBuffer,
+  stream <ap_uint<8>>   &   SigDataBuffer
+){
+    //unsigned int Ndbps=0; // Data bits per symbol
+    //unsigned int datarate=0;
+    stream<ap_uint<8>> SigBuffer;
+    stream<ap_uint<8>> ScrambBuffer; 
+    //switch (TXVECTOR.DATARATE){
+    //case 6: datarate=0xb;Ndbps=24;break;
+    //case 9: datarate=0xf;Ndbps=36;break;
+    //case 12:datarate=0xa;Ndbps=48;break;
+    //case 18:datarate=0xe;Ndbps=72;break;
+    //case 24:datarate=0x9;Ndbps=116;break;
+    //case 36:datarate=0xd;Ndbps=144;break;
+    //case 48:datarate=0x8;Ndbps=192;break;
+    //case 54:datarate=0xc;Ndbps=216;break;
+    //default:;
+    //}
+    //unsigned int Nsym = ceil((16+8*TXVECTOR.LENGTH+6)/Ndbps); // number of OFDM symbols
+    //unsigned int Ndata = Nsym*Ndbps;                 // number of bits in the DATA field
+    ofdm_sig_generator(
+      datarate,
+      length,
+      SigBuffer
+    );
+    ofdm_data_generator(
+      Nbyte,         //Bytes number of Service+DATA+TAIL+PAD
+      length,        //Data Length
+      DataBuffer,
+      ScrambBuffer
+      );
+    for(int i=0;i<3;++i){
+      ap_uint<8> data=SigBuffer.read();
+      SigDataBuffer.write(data);
+    }
+    for(int i=0;i<Nbyte;++i){
+      ap_uint<8> data=ScrambBuffer.read();
+      SigDataBuffer.write(data);
+    }
+}
+void ofdm_conv_encoder(
+  unsigned int Nconv                                  ,
+  stream <ap_uint<6>>         & ConvolFeederDataBuffer,
+  stream <ofdm_conv_data_t>   & ConvolEncDataBuffer
+){
+  ap_uint<6> shift_data=0;
+  ap_uint<6> cur_data=0;
+  ofdm_conv_data_t EncData;
+  for(int i=0;i<Nconv;++i){
+    shift_data=cur_data;
+    cur_data=ConvolFeederDataBuffer.read();
+  }
+}
+void ofdm_conv_punc(
+  unsigned int mode,    //0:1/2 1:2/3 2:3/4
+  stream <ofdm_conv_data_t>   & ConvolEncDataBuffer,
 
+  ){
+
+}
 void ofdm_transmitter(
-  ofdm_cfg_t                        cfg,
+  ofdm_cfg_t                        TXVECTOR,
   stream <unsigned char> &          DataBuffer,
   stream <ap_int<OFDM_IQ_WIDTH>> &  ISymbolBuffer,
   stream <ap_int<OFDM_IQ_WIDTH>> &  QSymbolBuffer
   ) {
+    unsigned int Ndbps=0; // Data bits per symbol
+    unsigned int datarate=0;
+    switch (TXVECTOR.DATARATE){
+      case 6: datarate=0xb;Ndbps=24;break;
+      case 9: datarate=0xf;Ndbps=36;break;
+      case 12:datarate=0xa;Ndbps=48;break;
+      case 18:datarate=0xe;Ndbps=72;break;
+      case 24:datarate=0x9;Ndbps=116;break;
+      case 36:datarate=0xd;Ndbps=144;break;
+      case 48:datarate=0x8;Ndbps=192;break;
+      case 54:datarate=0xc;Ndbps=216;break;
+      default:;
+    }
+    unsigned int Nsym  = ceil((16+8*TXVECTOR.LENGTH+6)/Ndbps); // number of OFDM symbols
+    unsigned int Ndata = Nsym*Ndbps;                 // number of bits in the DATA field
+    unsigned int Nbyte = Ndata/8;
+    unsigned int Nconv = Ndata/6;
+    stream <ap_uint<8>>   SigDataBuffer;
+    stream <ap_uint<6>>   ConvolFeederDataBuffer;
+    stream <ofdm_conv_data_t>   ConvolEncDataBuffer;
+    ofdm_sigdat_generator(
+      datarate,
+      TXVECTOR.LENGTH,
+      Nbyte,
+      DataBuffer,
+      SigDataBuffer
+    );
+    ofdm_conv_feeder(
+      Nbyte,
+      SigDataBuffer,
+      ConvolFeederDataBuffer
+    );
+    ofdm_conv_encoder(
+      Nconv ,
+      ConvolFeederDataBuffer,
+      ConvolEncDataBuffer
+    );
 
 }
