@@ -80,22 +80,7 @@ void ofdm_data_generator(
       shift_reg[0]  = shift_reg_pre[6]+shift_reg_pre[0];
     }
 }
-void ofdm_databits_reshape(
-  unsigned int Ndbps,                     //Data Bits Per symbol
-  unsigned int Nsym,                      //Symbol Number
-  stream <unsigned char> &               ScramblerDataBuffer    ,
-  stream <ofdm_databits_t> &             DataBitsBuffer 
-  ){
-    assert(Ndbps%8==0);
-    for(int i=0;i<Nsym;++i){
-      ofdm_databits_t DataBits=0;
-      for(int j=0;j<Ndbps/8;++j){
-        unsigned char ScramblerData=ScramblerDataBuffer.read();
-        DataBits.range(j*8+7,j*8) = ScramblerData;
-      }
-      DataBitsBuffer.write(DataBits);
-    }
-}
+
 void ofdm_conv_feeder(
     unsigned int Nbyte,
     stream <ap_uint<8>>   & SigDataBuffer,
@@ -210,13 +195,198 @@ void ofdm_conv_encoder(
   for(int i=0;i<Nconv;++i){
     shift_data=cur_data;
     cur_data=ConvolFeederDataBuffer.read();
+    EncData.A[0]=cur_data[0]+shift_data[1]+shift_data[2]+shift_data[4]+shift_data[5];
+    EncData.A[1]=cur_data[1]+shift_data[0]+shift_data[1]+shift_data[3]+shift_data[4];
+    EncData.A[2]=cur_data[2]+cur_data[0]+shift_data[0]+shift_data[2]+shift_data[3];
+    EncData.A[3]=cur_data[3]+cur_data[1]+cur_data[0]+shift_data[1]+shift_data[2];
+    EncData.A[4]=cur_data[4]+cur_data[2]+cur_data[1]+shift_data[0]+shift_data[1];
+    EncData.A[5]=cur_data[5]+cur_data[3]+cur_data[2]+cur_data[0]+shift_data[0];
+
+    EncData.B[0]=cur_data[0]+shift_data[0]+shift_data[1]+shift_data[2]+shift_data[5];
+    EncData.B[1]=cur_data[1]+cur_data[0]+shift_data[0]+shift_data[1]+shift_data[4];
+    EncData.B[2]=cur_data[2]+cur_data[1]+cur_data[0]+shift_data[0]+shift_data[3];
+    EncData.B[3]=cur_data[3]+cur_data[2]+cur_data[1]+cur_data[0]+shift_data[2];
+    EncData.B[4]=cur_data[4]+cur_data[3]+cur_data[2]+cur_data[1]+shift_data[1];
+    EncData.B[5]=cur_data[5]+cur_data[4]+cur_data[3]+cur_data[2]+shift_data[0];
+    ConvolEncDataBuffer.write(EncData);
   }
 }
 void ofdm_conv_punc(
   unsigned int mode,    //0:1/2 1:2/3 2:3/4
+  unsigned int Nconv,
   stream <ofdm_conv_data_t>   & ConvolEncDataBuffer,
-
-  ){
+  stream <ap_uint<12>>  &PuncDataBuffer 
+){
+  int k=0;
+  ofdm_conv_data_t  ConvolData;
+  for(int i=0;i<Nconv;++i){
+    ap_uint<12> PuncData;
+    ofdm_conv_data_t PreConvolData=ConvolData;
+    ConvolData=ConvolEncDataBuffer.read();
+    if(mode==0||(i<=3)){ //1/2 also for 24bits signals.
+      PuncData[0]=ConvolData.A[0];
+      PuncData[1]=ConvolData.B[0];
+      PuncData[2]=ConvolData.A[1];
+      PuncData[3]=ConvolData.B[1];
+      PuncData[4]=ConvolData.A[2];
+      PuncData[5]=ConvolData.B[2];
+      PuncData[6]=ConvolData.A[3];
+      PuncData[7]=ConvolData.B[3];
+      PuncData[8]=ConvolData.A[4];
+      PuncData[9]=ConvolData.B[4];
+      PuncData[10]=ConvolData.A[5];
+      PuncData[11]=ConvolData.B[5];
+      PuncDataBuffer.write(PuncData);
+    }else if(mode==1){
+      PuncData[0]=ConvolData.A[0];
+      PuncData[1]=ConvolData.B[0];
+      PuncData[2]=ConvolData.A[1];
+      PuncData[3]=ConvolData.A[2];
+      PuncData[4]=ConvolData.B[2];
+      PuncData[5]=ConvolData.A[3];
+      PuncData[6]=ConvolData.A[4];
+      PuncData[7]=ConvolData.B[4];
+      PuncData[8]=ConvolData.A[5];
+      PuncData[9]=0;
+      PuncData[10]=0;
+      PuncData[11]=0;
+      PuncDataBuffer.write(PuncData);
+    }else{
+      if(k==1){
+        PuncData[0]=PreConvolData.A[0];
+        PuncData[1]=PreConvolData.B[0];
+        PuncData[2]=PreConvolData.A[1];
+        PuncData[3]=PreConvolData.B[2];
+        PuncData[4]=PreConvolData.A[3];
+        PuncData[5]=PreConvolData.B[3];
+        PuncData[6]=PreConvolData.A[4];
+        PuncData[7]=PreConvolData.B[5];
+        PuncData[8]=ConvolData.A[0];
+        PuncData[9]=ConvolData.B[0];
+        PuncData[10]=ConvolData.A[1];
+        PuncData[11]=ConvolData.B[2];
+        PuncDataBuffer.write(PuncData);
+      }else if(k==2){
+        PuncData[0]=PreConvolData.A[3];
+        PuncData[1]=PreConvolData.B[3];
+        PuncData[2]=PreConvolData.A[4];
+        PuncData[3]=PreConvolData.B[5];
+        PuncData[4]=ConvolData.A[0];
+        PuncData[5]=ConvolData.B[0];
+        PuncData[6]=ConvolData.A[1];
+        PuncData[7]=ConvolData.B[2];
+        PuncData[8]=ConvolData.A[3];
+        PuncData[9]=ConvolData.B[3];
+        PuncData[10]=ConvolData.A[4];
+        PuncData[11]=ConvolData.B[5];
+        PuncDataBuffer.write(PuncData);
+      }
+      if(k==2){
+        k=0;
+      }else{
+        ++k;
+      }
+    }
+  }
+}
+void ofdm_databits_reshape(
+  unsigned int Ncbps,                    //Coded Bits Per symbol
+  unsigned int NPunc,                    //Punc Numbers
+  unsigned int PuncMode,
+  stream <ap_uint<12>>  &                PuncDataBuffer, 
+  stream <ofdm_codedbits_t> &            CodedBitsBuffer 
+){
+  ofdm_codedbits_t  CodedBits;
+  ap_uint<12> PuncData;
+  int k=0;
+  for(int i=0;i<4;++i){
+    PuncData=PuncDataBuffer.read();
+    CodedBits.range(i*12+5,i*12)=PuncData;
+  }
+  for(int i=4;i<NPunc;++i){
+    PuncData=PuncDataBuffer.read();
+    if(Ncbps==48){
+      if(PuncMode==2){  //(48/12=4)
+        CodedBits.range(12*k+11,12*k)=PuncData;
+        if(k==3){
+          CodedBitsBuffer.write(CodedBits);
+          k=0;
+        }else{
+          ++k;
+        }
+      }else if(PuncMode==0){//(48/12=4)
+        CodedBits.range(12*k+11,12*k)=PuncData;
+        if(k==3){
+          CodedBitsBuffer.write(CodedBits);
+          k=0;
+        }else{
+          ++k;
+        }
+      }
+    }else if(Ncbps==96){
+      if(PuncMode==2){//(96/12=8)
+        CodedBits.range(12*k+11,12*k)=PuncData;
+        if(k==7){
+          CodedBitsBuffer.write(CodedBits);
+          k=0;
+        }else{
+          ++k;
+        }
+      }else if(PuncMode==0){//(96/12=8)
+        CodedBits.range(12*k+11,12*k)=PuncData;
+        if(k==7){
+          CodedBitsBuffer.write(CodedBits);
+          k=0;
+        }else{
+          ++k;
+        }
+      }
+    }else if(Ncbps==192){
+      if(PuncMode==2){//(192/12=16)
+        CodedBits.range(12*k+11,12*k)=PuncData;
+        if(k==15){
+          CodedBitsBuffer.write(CodedBits);
+          k=0;
+        }else{
+          ++k;
+        }
+      }else if(PuncMode==0){//(192/12=16)
+        CodedBits.range(12*k+11,12*k)=PuncData;
+        if(k==15){
+          CodedBitsBuffer.write(CodedBits);
+          k=0;
+        }else{
+          ++k;
+        }
+      }
+    }else if(Ncbps==288){
+      if(PuncMode==2){//(288/12=24)
+        CodedBits.range(12*k+11,12*k)=PuncData;
+        if(k==23){
+          CodedBitsBuffer.write(CodedBits);
+          k=0;
+        }else{
+          ++k;
+        }
+      }else if(PuncMode==1){//(288/9=32)
+        CodedBits.range(9*k+11,9*k)=PuncData;
+        if(k==31){
+          CodedBitsBuffer.write(CodedBits);
+          k=0;
+        }else{
+          ++k;
+        }
+      }
+    }else{
+      assert(0);
+    }
+  }
+}
+void ofdm_interleave(
+  unsigned int Ncbps,                    //Coded Bits Per symbol
+  stream <ofdm_codedbits_t>   CodedBitsBuffer,
+  stream <ofdm_codedbits_t>   InterleavedBitsBuffer
+){
 
 }
 void ofdm_transmitter(
@@ -226,25 +396,30 @@ void ofdm_transmitter(
   stream <ap_int<OFDM_IQ_WIDTH>> &  QSymbolBuffer
   ) {
     unsigned int Ndbps=0; // Data bits per symbol
+    unsigned int Ncbps=0;
     unsigned int datarate=0;
+    unsigned int PuncMode=0;
     switch (TXVECTOR.DATARATE){
-      case 6: datarate=0xb;Ndbps=24;break;
-      case 9: datarate=0xf;Ndbps=36;break;
-      case 12:datarate=0xa;Ndbps=48;break;
-      case 18:datarate=0xe;Ndbps=72;break;
-      case 24:datarate=0x9;Ndbps=116;break;
-      case 36:datarate=0xd;Ndbps=144;break;
-      case 48:datarate=0x8;Ndbps=192;break;
-      case 54:datarate=0xc;Ndbps=216;break;
+      case 6: datarate=0xb;Ndbps=24;Ncbps=48;break;
+      case 9: datarate=0xf;Ndbps=36;Ncbps=48;PuncMode=2;break;
+      case 12:datarate=0xa;Ndbps=48;Ncbps=96;break;
+      case 18:datarate=0xe;Ndbps=72;Ncbps=96;PuncMode=2;break;
+      case 24:datarate=0x9;Ndbps=116;Ncbps=192;break;
+      case 36:datarate=0xd;Ndbps=144;Ncbps=192;PuncMode=2;break;
+      case 48:datarate=0x8;Ndbps=192;Ncbps=288;PuncMode=1;break;
+      case 54:datarate=0xc;Ndbps=216;Ncbps=288;PuncMode=0;break;
       default:;
     }
     unsigned int Nsym  = ceil((16+8*TXVECTOR.LENGTH+6)/Ndbps); // number of OFDM symbols
     unsigned int Ndata = Nsym*Ndbps;                 // number of bits in the DATA field
     unsigned int Nbyte = Ndata/8;
-    unsigned int Nconv = Ndata/6;
+    unsigned int Nconv = Ndata/6+4;
+    unsigned int NPunc =0;
     stream <ap_uint<8>>   SigDataBuffer;
     stream <ap_uint<6>>   ConvolFeederDataBuffer;
     stream <ofdm_conv_data_t>   ConvolEncDataBuffer;
+    stream <ap_uint<12>>  PuncDataBuffer;
+    stream <ofdm_codedbits_t>   CodedBitsBuffer;
     ofdm_sigdat_generator(
       datarate,
       TXVECTOR.LENGTH,
@@ -253,7 +428,7 @@ void ofdm_transmitter(
       SigDataBuffer
     );
     ofdm_conv_feeder(
-      Nbyte,
+      Nbyte+3,
       SigDataBuffer,
       ConvolFeederDataBuffer
     );
@@ -262,5 +437,24 @@ void ofdm_transmitter(
       ConvolFeederDataBuffer,
       ConvolEncDataBuffer
     );
-
+    ofdm_conv_punc(
+      PuncMode,    //0:1/2 1:2/3 2:3/4
+      Nconv,
+      ConvolEncDataBuffer,
+      PuncDataBuffer 
+    );
+    if(PuncMode==0){
+      NPunc=Nconv;
+    }else if(PuncMode==1){
+      NPunc=4+(Nconv-4)/2;
+    }else if(PuncMode==2){
+      NPunc=4+(Nconv-4)*2/3;
+    }
+    ofdm_databits_reshape(
+      Ncbps,                    //Coded Bits Per symbol
+      NPunc,                    //Punc Numbers
+      PuncMode,
+      PuncDataBuffer, 
+      CodedBitsBuffer
+    );
 }
