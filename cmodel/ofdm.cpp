@@ -382,10 +382,53 @@ void ofdm_databits_reshape(
     }
   }
 }
-void ofdm_interleave(
+int interleaved_idx(
+  int Ncbps,
+  int k
+){
+  int i = (Ncbps/16)*(k%16)+k/16;
+  int s = (Ncbps>=96)?(Ncbps/96):1;
+  int j = (i/s)*s+(i+Ncbps-16*i/Ncbps)%s;
+  return j;
+}
+void ofdm_interleaver(
   unsigned int Ncbps,                    //Coded Bits Per symbol
-  stream <ofdm_codedbits_t>   CodedBitsBuffer,
-  stream <ofdm_codedbits_t>   InterleavedBitsBuffer
+  unsigned int Nsym,
+  stream <ofdm_codedbits_t>&   CodedBitsBuffer,
+  stream <ofdm_codedbits_t>&   InterleavedBitsBuffer
+){
+  ofdm_codedbits_t coded_data;
+  ofdm_codedbits_t interleaved_data;
+  for(int i=0;i<Nsym;++i){
+    coded_data=CodedBitsBuffer.read();
+    if((i==0)||Ncbps==48){
+      for(int k=0;k<48;++k){
+        interleaved_data[interleaved_idx(48,k)]=coded_data[k];
+      }
+    }else if(Ncbps==96){
+      for(int k=0;k<96;++k){
+        interleaved_data[interleaved_idx(96,k)]=coded_data[k];
+      }
+    }else if(Ncbps==128){
+      for(int k=0;k<128;++k){
+        interleaved_data[interleaved_idx(128,k)]=coded_data[k];
+      }
+    }else if(Ncbps==192){
+      for(int k=0;k<192;++k){
+        interleaved_data[interleaved_idx(192,k)]=coded_data[k];
+      }
+    }else if(Ncbps==288){
+      for(int k=0;k<288;++k){
+        interleaved_data[interleaved_idx(288,k)]=coded_data[k];
+      }
+    }
+    InterleavedBitsBuffer.write(interleaved_data);
+  }
+}
+void ofdm_modulation_mapping(
+  unsigned int Ncbps,                    //Coded Bits Per symbol
+  unsigned int Nsym,
+  stream <ofdm_codedbits_t>&   InterleavedBitsBuffer,
 ){
 
 }
@@ -420,6 +463,7 @@ void ofdm_transmitter(
     stream <ofdm_conv_data_t>   ConvolEncDataBuffer;
     stream <ap_uint<12>>  PuncDataBuffer;
     stream <ofdm_codedbits_t>   CodedBitsBuffer;
+    stream <ofdm_codedbits_t>   InterleavedBitsBuffer;
     ofdm_sigdat_generator(
       datarate,
       TXVECTOR.LENGTH,
@@ -457,4 +501,10 @@ void ofdm_transmitter(
       PuncDataBuffer, 
       CodedBitsBuffer
     );
+    ofdm_interleaver(
+      Ncbps,                    //Coded Bits Per symbol
+      Nsym+1,
+      CodedBitsBuffer,
+      InterleavedBitsBuffer
+  );
 }
